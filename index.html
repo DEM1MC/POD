@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bosch POD Portál</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root { 
+            --bosch-blue: #005691; 
+            --bosch-dark-blue: #00385f; 
+            --bosch-gray-bg: #f0f2f5; 
+            --surface: #ffffff; 
+            --border: #dee2e6; 
+            --text-dark: #212529; 
+            --text-muted: #6c757d; 
+        }
+        body { font-family: sans-serif; background-color: var(--bosch-gray-bg); color: var(--text-dark); margin: 0; }
+        .container { max-width: 1800px; margin: 20px auto; padding: 20px; background: var(--surface); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: var(--bosch-dark-blue); }
+        .search-panel { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        input { padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; }
+        .global-search { flex-grow: 1; }
+        button { padding: 8px 15px; border: none; border-radius: 4px; color: white; background-color: var(--bosch-blue); cursor: pointer; font-size: 14px; }
+        button:hover { background-color: var(--bosch-dark-blue); }
+        .table-responsive { overflow-x: auto; position: relative; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background-color: #f8f9fa; padding: 10px; text-align: left; border-bottom: 2px solid var(--border); white-space: nowrap; user-select: none; }
+        
+        th[data-sort] { cursor: pointer; position: relative; padding-right: 20px; }
+        th[data-sort]:hover { background-color: #e9ecef; }
+        
+        .col-filter-input { width: 90%; padding: 4px 6px; font-size: 11px; margin-top: 5px; display: block; border: 1px solid #ccc; border-radius: 3px; }
+        
+        td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        
+        tr.has-file { background-color: #e2f0d9 !important; } 
+        tr.no-file { background-color: #f8d7da !important; }  
+        
+        tr.has-file:hover { background-color: #d0e1c4 !important; }
+        tr.no-file:hover { background-color: #f1c1c6 !important; }
+        
+        td[contenteditable="true"] { background-color: #fffde7; cursor: pointer; }
+        td[contenteditable="true"]:focus { background-color: #fef08a; outline: 2px solid var(--bosch-blue); }
+        
+        /* Legördülő lista dizájn */
+        .col-select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background-color: #fffde7;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+        }
+        .col-select:focus {
+            border-color: var(--bosch-blue);
+            background-color: #fef08a;
+        }
+
+        .action-btns { display: flex; gap: 6px; align-items: center; }
+        .action-btns a, .action-btns button { padding: 5px 8px; font-size: 12px; text-decoration: none; border-radius: 4px; border: 1px solid transparent; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; }
+        .file-link { background: #e0f2fe; color: var(--bosch-blue); border-color: #bae6fd; }
+        .btn-download { background: #dcfce7; color: #166534; border-color: #bbf7d0; cursor: pointer; }
+        .btn-download:hover { background: #bbf7d0; }
+        .btn-delete { background-color: #fee2e2; color: #991b1b; border-color: #fecaca; cursor: pointer; }
+        .btn-delete:hover { background-color: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>BOSCH POD Management System</h1>
+    
+    <div class="search-panel">
+        <input type="text" id="searchInput" class="global-search" placeholder="Invoice,Shipment_No,Customer,Country" autofocus>
+        <button onclick="fetchRecords()">🔍 Keresés</button>
+        <button class="btn-secondary" onclick="fetchRecords(true)">📋 Összes Betöltése</button>
+        <button onclick="exportToExcel()" class="btn-export">📥 Excel Export</button>
+        <button onclick="resetColumnFilters()" class="btn-secondary" style="background-color: #6c757d;">❌ Szűrők törlése</button>
+    </div>
+    <div class="status-bar" id="statusMsg">Készen áll.</div>
+
+    <!-- Felső vízszintes csúszka -->
+    <div id="topScrollWrapper" style="overflow-x: auto; overflow-y: hidden; height: 20px; margin-bottom: 3px;">
+        <div id="topScrollDummy" style="height: 1px; font-size: 1px; line-height: 1px;">&nbsp;</div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th data-sort="Invoice">Invoice <input type="text" class="col-filter-input" data-col="Invoice" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Billing_Date">Billing Date <input type="text" class="col-filter-input" data-col="Billing_Date" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Sold_To">Sold-To <input type="text" class="col-filter-input" data-col="Sold_To" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Customer">Customer <input type="text" class="col-filter-input" data-col="Customer" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Country">Country <input type="text" class="col-filter-input" data-col="Country" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Document_Type">Document Type <input type="text" class="col-filter-input" data-col="Document_Type" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Upload_Date">Upload Date <input type="text" class="col-filter-input" data-col="Upload_Date" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="CMR_Date">CMR Date <input type="text" class="col-filter-input" data-col="CMR_Date" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Comment">Comment <input type="text" class="col-filter-input" data-col="Comment" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="DN">DN <input type="text" class="col-filter-input" data-col="DN" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Transport_Order">Transport Order <input type="text" class="col-filter-input" data-col="Transport_Order" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Shipment_No">Shipment No <input type="text" class="col-filter-input" data-col="Shipment_No" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th data-sort="Box_24_Belyegzo">Box 24 Bélyegző <input type="text" class="col-filter-input" data-col="Box_24_Belyegzo" placeholder="Szűrés..." onclick="event.stopPropagation()"></th>
+                    <th style="text-align: center;">Műveletek</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://127.0.0.1:8000";
+    let currentData = [];
+    let activeSortedColumn = null;
+    let sortDirection = 'asc';
+
+    const topScrollWrapper = document.getElementById('topScrollWrapper');
+    const tableResponsive = document.querySelector('.table-responsive');
+    const topScrollDummy = document.getElementById('topScrollDummy');
+    const resultsTable = document.getElementById('resultsTable');
+
+    topScrollWrapper.onscroll = function() {
+        tableResponsive.scrollLeft = topScrollWrapper.scrollLeft;
+    };
+    tableResponsive.onscroll = function() {
+        topScrollWrapper.scrollLeft = tableResponsive.scrollLeft;
+    };
+
+    function syncScrollbarWidth() {
+        topScrollDummy.style.width = resultsTable.offsetWidth + "px";
+    }
+
+    async function fetchRecords(all = false) {
+        const query = all ? '' : document.getElementById('searchInput').value.trim();
+        const url = all ? `${API_BASE}/api/all` : `${API_BASE}/api/search?query=${encodeURIComponent(query)}`;
+        const statusMsg = document.getElementById('statusMsg');
+        statusMsg.textContent = 'Adatok betöltése...';
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Szerver hiba');
+            const data = await response.json();
+            currentData = data;
+            renderTable(data);
+            statusMsg.textContent = `${data.length} db rekord megjelenítve.`;
+        } catch (error) {
+            statusMsg.textContent = `Hiba a betöltéskor: ${error.message}`;
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;">Nincs találat.</td></tr>';
+            return;
+        }
+
+        const columns = [
+            'Invoice', 'Billing_Date', 'Sold_To', 'Customer', 'Country', 'Document_Type',
+            'Upload_Date', 'CMR_Date', 'Comment', 'DN', 'Transport_Order', 'Shipment_No', 'Box_24_Belyegzo'
+        ];
+        
+        // A Comment és a Box 24 Bélyegző maradtak contenteditable mezők
+        const editable_columns = ['Comment', 'Box_24_Belyegzo'];
+
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.dataset.id = row.id;
+
+            const filePath = row.Uj_Fajl_Utvonala || "";
+            const hasFile = filePath && filePath !== "N/A" && filePath !== "";
+            if (hasFile) {
+                tr.classList.add('has-file');
+            } else {
+                tr.classList.add('no-file');
+            }
+
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                const val = row[col];
+                
+                if (col === 'Document_Type') {
+                    // JAVÍTÁS: Egyedi legördülő lista (select) létrehozása a kért 3 opcióval
+                    const select = document.createElement('select');
+                    select.className = 'col-select';
+                    
+                    const options = [
+                        { value: '', text: '' },
+                        { value: 'Kiléptetési Igazolás', text: 'Kiléptetési Igazolás' },
+                        { value: 'Aláírt CMR', text: 'Aláírt CMR' },
+                        { value: 'Vevői Igazolás', text: 'Vevői Igazolás' }
+                    ];
+                    
+                    options.forEach(opt => {
+                        const optElem = document.createElement('option');
+                        optElem.value = opt.value;
+                        optElem.textContent = opt.text;
+                        if ((val || '') === opt.value) {
+                            optElem.selected = true;
+                        }
+                        select.appendChild(optElem);
+                    });
+                    
+                    // Értékváltozáskor azonnali háttérmentés
+                    select.addEventListener('change', async (e) => {
+                        const pk = row.id;
+                        const newValue = e.target.value;
+                        await updateCellInDatabase(pk, 'Document_Type', newValue, select);
+                    });
+                    
+                    td.appendChild(select);
+                } else if (editable_columns.includes(col)) {
+                    td.textContent = (val && val !== '-') ? val : '';
+                    td.setAttribute('contenteditable', 'true');
+                    td.dataset.column = col;
+                    td.title = "Kattints a szerkesztéshez!";
+                    td.addEventListener('blur', handleCellEdit);
+                } else {
+                    td.textContent = (val && val !== '-') ? val : '';
+                }
+                tr.appendChild(td);
+            });
+
+            // Műveletek gombok
+            const actionTd = document.createElement('td');
+            const targetFilename = `${row.Invoice || 'NoInv'}_${row.Shipment_No || 'NoShip'}.pdf`;
+            
+            actionTd.className = 'action-btns';
+            
+            const viewLink = hasFile ? `<a href="${API_BASE}/api/file?path=${encodeURIComponent(filePath)}" target="_blank" class="file-link" title="Megnyitás">📄</a>` : '';
+            const downloadBtn = hasFile ? `<a href="${API_BASE}/api/file?path=${encodeURIComponent(filePath)}&download=true" class="btn-download" title="Letöltés" download>💾</a>` : '';
+            
+            actionTd.innerHTML = `
+                ${viewLink}
+                ${downloadBtn}
+                <button class="btn-delete" title="Törlés" onclick="deleteRecord(${row.id})">🗑️</button>
+            `;
+            tr.appendChild(actionTd);
+            tbody.appendChild(tr);
+        });
+
+        setTimeout(syncScrollbarWidth, 100);
+    }
+
+    // Közös, aszinkron mentőfüggvény
+    async function updateCellInDatabase(pk, column, value, element) {
+        try {
+            const response = await fetch(`${API_BASE}/api/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pk, column, value })
+            });
+            if (!response.ok) throw new Error('Mentés sikertelen');
+            
+            // Halványzöld visszajelzés a cella szülőelemének (td-nek)
+            const parentTd = element.tagName === 'SELECT' ? element.parentElement : element;
+            parentTd.style.backgroundColor = '#d4edda';
+            setTimeout(() => { parentTd.style.backgroundColor = ''; }, 1500);
+            
+            // Helyi cache frissítése
+            const record = currentData.find(r => r.id == pk);
+            if (record) record[column] = value;
+        } catch (error) {
+            alert(`Hiba a mentéskor: ${error.message}`);
+            // Hiba esetén visszaállítjuk az eredeti értéket
+            const record = currentData.find(r => r.id == pk);
+            if (record) {
+                element.value = record[column] || '';
+            }
+            const parentTd = element.tagName === 'SELECT' ? element.parentElement : element;
+            parentTd.style.backgroundColor = '#f8d7da';
+        }
+    }
+
+    async function handleCellEdit(event) {
+        const td = event.target;
+        const pk = td.parentElement.dataset.id;
+        const column = td.dataset.column;
+        const value = td.textContent.trim();
+
+        const originalValue = currentData.find(r => r.id == pk)[column];
+        if (value === originalValue) return;
+
+        await updateCellInDatabase(pk, column, value, td);
+    }
+    
+    // Törlés
+    async function deleteRecord(pk) {
+        if (!confirm(`Biztosan törölni szeretnéd ezt a rekordot?`)) return;
+        try {
+            const response = await fetch(`${API_BASE}/api/delete?pk=${pk}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Törlés sikertelen');
+            document.querySelector(`tr[data-id='${pk}']`).remove();
+            currentData = currentData.filter(r => r.id != pk);
+        } catch (error) {
+            alert(`Hiba a törléskor: ${error.message}`);
+        }
+    }
+    
+    // Élő szűrések
+    function applyColumnFilters() {
+        const filterInputs = document.querySelectorAll(".col-filter-input");
+        const activeFilters = {};
+
+        filterInputs.forEach(input => {
+            const col = input.parentElement.getAttribute("data-sort");
+            const val = input.value.trim().toLowerCase();
+            if (val) activeFilters[col] = val;
+        });
+
+        const filteredData = currentData.filter(row => {
+            for (const [col, filterVal] of Object.entries(activeFilters)) {
+                const cellVal = String(row[col] || "").toLowerCase();
+                if (!cellVal.includes(filterVal)) return false;
+            }
+            return true;
+        });
+
+        renderTable(filteredData);
+    }
+
+    document.querySelectorAll(".col-filter-input").forEach(input => {
+        input.addEventListener("input", applyColumnFilters);
+    });
+
+    function resetColumnFilters() {
+        document.querySelectorAll(".col-filter-input").forEach(input => input.value = "");
+        renderTable(currentData);
+    }
+
+    document.querySelectorAll("th[data-sort]").forEach(th => {
+        th.addEventListener("click", () => {
+            const col = th.getAttribute("data-sort");
+            
+            if (activeSortedColumn === col) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                activeSortedColumn = col;
+                sortDirection = 'asc';
+            }
+
+            currentData.sort((a, b) => {
+                let valA = a[col] || '';
+                let valB = b[col] || '';
+
+                if (!isNaN(valA) && !isNaN(valB) && valA !== '' && valB !== '') {
+                    return sortDirection === 'asc' ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
+                }
+                return sortDirection === 'asc' 
+                    ? String(valA).localeCompare(String(valB), 'hu') 
+                    : String(valB).localeCompare(String(valA), 'hu');
+            });
+
+            renderTable(currentData);
+            updateSortIndicators(th);
+        });
+    });
+
+    function updateSortIndicators(activeTh) {
+        document.querySelectorAll("th[data-sort]").forEach(th => {
+            const label = th.childNodes[0].textContent.replace(/[▲▼]/g, "").trim();
+            if (th === activeTh) {
+                th.childNodes[0].textContent = label + (sortDirection === 'asc' ? " ▲ " : " ▼ ");
+            } else {
+                th.childNodes[0].textContent = label + " ";
+            }
+        });
+    }
+
+    // Excel export
+    function exportToExcel() {
+        if (currentData.length === 0) { alert("Nincs mit exportálni!"); return; }
+        const exportClean = currentData.map(({ id, Uj_Fajl_Utvonala, Eredeti_Fajlnev, ...rest }) => rest);
+        const ws = XLSX.utils.json_to_sheet(exportClean);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "POD_Riport");
+        XLSX.writeFile(wb, `POD_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    window.onload = () => {
+        fetchRecords(true);
+        window.addEventListener('resize', syncScrollbarWidth);
+    };
+</script>
+
+</body>
+</html>

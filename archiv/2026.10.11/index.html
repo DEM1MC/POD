@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bosch POD Dokumentum Kereső</title>
+    <!-- SheetJS az azonnali Excel exporthoz -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #005691;
+            --primary-hover: #003f69;
+            --success: #198754;
+            --success-hover: #157347;
+            --danger: #d9383a;
+            --danger-hover: #b8282a;
+            --bg: #f4f6f9;
+            --surface: #ffffff;
+            --border: #d9e1e8;
+            --text: #212529;
+            --text-muted: #6c757d;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1540px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 28px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 280px;
+            padding: 12px 16px;
+            font-size: 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background-color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background-color: #343a40;
+        }
+
+        .btn-export {
+            background-color: var(--success);
+        }
+
+        .btn-export:hover {
+            background-color: var(--success-hover);
+        }
+
+        .status {
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: var(--text-muted);
+            min-height: 20px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 12px 14px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .badge-country {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #334155;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .file-link {
+            display: inline-block;
+            background: #e7f1ff;
+            color: var(--primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 12px;
+            transition: background 0.2s;
+            border: 1px solid #cce2ff;
+        }
+
+        .file-link:hover {
+            background: #cfe2ff;
+        }
+
+        .btn-download {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-download:hover {
+            background: #bbf7d0;
+        }
+
+        .btn-delete {
+            background: #ffe5e5;
+            color: var(--danger);
+            border: 1px solid #ffcccc;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📦 Bosch POD Kereső és Kezelő Portál</h1>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Írj be egy Számlaszámot, Shipment számot, Telephelyet, Országot..." autofocus>
+        <button onclick="performSearch()">🔍 Keresés</button>
+        <button onclick="loadAllRecords()" class="btn-secondary">📋 Összes Listázása</button>
+        <button onclick="exportCurrentTableToExcel()" class="btn-export">📥 Excel Export</button>
+    </div>
+
+    <div class="status" id="statusMsg">Készen áll a keresésre.</div>
+
+    <div class="table-responsive">
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>CMR Dátum</th>
+                    <th>Invoice (DALI)</th>
+                    <th>Shipment No.</th>
+                    <th>CMR Szám</th>
+                    <th>Transport Order</th>
+                    <th>Loading List</th>
+                    <th>Customs Seal</th>
+                    <th>Box 24 Bélyegző</th>
+                    <th>Címzett</th>
+                    <th>Telephely</th>
+                    <th>Ország</th>
+                    <th>Fuvarozó</th>
+                    <th>Dokumentum</th>
+                    <th style="text-align: center;">Művelet</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr>
+                    <td colspan="14" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        Nincs megjelenítendő adat. Keress rá egy számra, vagy kattints az „Összes Listázása” gombra!
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://127.0.0.1:8000";
+    let currentLoadedRecords = [];
+
+    document.getElementById("searchInput").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") {
+            performSearch();
+        }
+    });
+
+    async function performSearch() {
+        const query = document.getElementById("searchInput").value.trim();
+        const statusMsg = document.getElementById("statusMsg");
+
+        if (!query) {
+            statusMsg.textContent = "Kérlek, adj meg egy keresési értéket!";
+            return;
+        }
+
+        statusMsg.textContent = `Keresés folyamatban: "${query}"...`;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/search?query=${encodeURIComponent(query)}`);
+            if (!res.ok) throw new Error("A szerver hibát adott vissza.");
+            const data = await res.json();
+            currentLoadedRecords = data;
+            renderTableRows(data);
+            statusMsg.textContent = `Találatok száma: ${data.length} db rekord.`;
+        } catch (err) {
+            statusMsg.textContent = `❌ Hiba a lekérdezés során: ${err.message}. Fut a 'python api_server.py'?`;
+        }
+    }
+
+    async function loadAllRecords() {
+        const statusMsg = document.getElementById("statusMsg");
+        document.getElementById("searchInput").value = "";
+        statusMsg.textContent = "Összes rekord betöltése folyamatban...";
+
+        try {
+            const res = await fetch(`${API_BASE}/api/all`);
+            if (!res.ok) throw new Error("A szerver hibát adott vissza.");
+            const data = await res.json();
+            currentLoadedRecords = data;
+            renderTableRows(data);
+            statusMsg.textContent = `Összesen ${data.length} db rekord betöltve az adatbázisból.`;
+        } catch (err) {
+            statusMsg.textContent = `❌ Hiba a betöltéskor: ${err.message}. Fut a 'python api_server.py'?`;
+        }
+    }
+
+    async function deleteRecord(filename) {
+        if (!confirm(`Biztosan törölni szeretnéd a következő rekordot az adatbázisból?\n\nFájlnév: ${filename}`)) {
+            return;
+        }
+
+        const statusMsg = document.getElementById("statusMsg");
+        statusMsg.textContent = `Törlés folyamatban: ${filename}...`;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/delete?filename=${encodeURIComponent(filename)}`, {
+                method: "DELETE"
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || "Törlési hiba történt.");
+            }
+
+            const rowElem = document.getElementById(`row-${btoa(encodeURIComponent(filename)).replace(/=/g, '')}`);
+            if (rowElem) {
+                rowElem.remove();
+            }
+
+            currentLoadedRecords = currentLoadedRecords.filter(r => r.Eredeti_Fajlnev !== filename);
+            statusMsg.textContent = `✔ A(z) '${filename}' sikeresen törölve lett az adatbázisból!`;
+        } catch (err) {
+            statusMsg.textContent = `❌ Sikertelen törlés: ${err.message}`;
+        }
+    }
+
+    async function downloadPDF(encodedPath, fileName) {
+        try {
+            const res = await fetch(`${API_BASE}/api/file?path=${encodedPath}&download=true`);
+            if (!res.ok) {
+                alert("A fájl letöltése nem sikerült.");
+                return;
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        } catch (e) {
+            alert("Hálózati hiba a letöltés során.");
+        }
+    }
+
+    function renderTableRows(records) {
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; color: var(--text-muted); padding: 24px;">Nem található illeszkedő rekord az adatbázisban.</td></tr>`;
+            return;
+        }
+
+        records.forEach(row => {
+            const tr = document.createElement("tr");
+            const rowId = `row-${btoa(encodeURIComponent(row.Eredeti_Fajlnev)).replace(/=/g, '')}`;
+            tr.id = rowId;
+
+            const filePath = row.Uj_Fajl_Utvonala || "";
+            const ext = filePath.includes(".") ? filePath.split('.').pop() : "pdf";
+            const targetFilename = `${row.Invoice_from_DALI || 'NoInv'}_${row.Shipment_No || 'NoShip'}.${ext}`;
+
+            const fileLink = filePath && filePath !== "N/A"
+                ? `<a href="${API_BASE}/api/file?path=${encodeURIComponent(filePath)}" target="_blank" rel="noopener noreferrer" class="file-link">📄 Megnyitás</a>`
+                : `<span style="color: #999;">N/A</span>`;
+
+            const downloadBtn = filePath && filePath !== "N/A"
+                ? `<button class="btn-download" onclick="downloadPDF('${encodeURIComponent(filePath)}', '${escapeJsString(targetFilename)}')">💾 Letöltés</button>`
+                : ``;
+
+            // Ország és Telephely intelligens szétbontása, ha a régi adatbázis-rekord egyben tartalmazta
+            let siteDisplay = row.Atvevo_Telephely || "Unknown";
+            let countryDisplay = row.Orszag || "Unknown";
+            if ((!row.Orszag || row.Orszag === "Unknown") && siteDisplay.includes(",")) {
+                const parts = siteDisplay.split(",");
+                siteDisplay = parts[0].trim();
+                countryDisplay = parts[1].trim();
+            }
+
+            tr.innerHTML = `
+                <td>${escapeHtml(row.Datum)}</td>
+                <td style="color: var(--primary); font-weight: bold;">${escapeHtml(row.Invoice_from_DALI)}</td>
+                <td>${escapeHtml(row.Shipment_No)}</td>
+                <td>${escapeHtml(row.CMR_Szam)}</td>
+                <td>${escapeHtml(row.Transport_Order)}</td>
+                <td>${escapeHtml(row.Loading_List)}</td>
+                <td>${escapeHtml(row.Customs_Seal)}</td>
+                <td>${escapeHtml(row.Box_24_Belyegzo)}</td>
+                <td>${escapeHtml(row.Cimzett)}</td>
+                <td>${escapeHtml(siteDisplay)}</td>
+                <td><span class="badge-country">${escapeHtml(countryDisplay)}</span></td>
+                <td><strong>${escapeHtml(row.Fuvarozo || "Review Manually")}</strong></td>
+                <td>
+                    <div class="action-btns">
+                        ${fileLink}
+                        ${downloadBtn}
+                    </div>
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn-delete" title="Sor törlése az adatbázisból" onclick="deleteRecord('${escapeJsString(row.Eredeti_Fajlnev)}')">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function exportCurrentTableToExcel() {
+        if (!currentLoadedRecords || currentLoadedRecords.length === 0) {
+            alert("Nincs exportálható adat a táblázatban!");
+            return;
+        }
+
+        const exportData = currentLoadedRecords.map(r => {
+            let siteDisplay = r.Atvevo_Telephely || "";
+            let countryDisplay = r.Orszag || "";
+            if (!countryDisplay && siteDisplay.includes(",")) {
+                const parts = siteDisplay.split(",");
+                siteDisplay = parts[0].trim();
+                countryDisplay = parts[1].trim();
+            }
+            return {
+                "CMR Dátum": r.Datum || "",
+                "Invoice (DALI)": r.Invoice_from_DALI || "",
+                "Shipment No.": r.Shipment_No || "",
+                "CMR Szám": r.CMR_Szam || "",
+                "Transport Order": r.Transport_Order || "",
+                "Loading List": r.Loading_List || "",
+                "Customs Seal": r.Customs_Seal || "",
+                "Box 24 Bélyegző": r.Box_24_Belyegzo || "",
+                "Címzett": r.Cimzett || "",
+                "Átvevő Telephely": siteDisplay,
+                "Ország": countryDisplay,
+                "Fuvarozó": r.Fuvarozo || "",
+                "Fájl Elérési Útja": r.Uj_Fajl_Utvonala || ""
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "POD_Riport");
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(workbook, `POD_Export_${timestamp}.xlsx`);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return "-";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function escapeJsString(str) {
+        if (!str) return "";
+        return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+</script>
+
+</body>
+</html>

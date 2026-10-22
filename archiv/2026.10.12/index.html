@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bosch POD Portál</title>
+    <!-- SheetJS az azonnali Excel exporthoz -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bosch-blue: #005691;
+            --bosch-dark-blue: #00385f;
+            --bosch-accent: #008ecf;
+            --bosch-red: #d9383a;
+            --bosch-gray-bg: #edf1f5;
+            --surface: #ffffff;
+            --border: #d2dbe3;
+            --text-dark: #1b242c;
+            --text-muted: #5e6a75;
+            --card-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+            --card-hover-shadow: 0 8px 24px rgba(0, 86, 145, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bosch-gray-bg);
+            color: var(--text-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* FELSŐ FEJLÉC */
+        header.pms-header {
+            background: linear-gradient(90deg, var(--bosch-dark-blue) 0%, var(--bosch-blue) 100%);
+            color: #ffffff;
+            padding: 14px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-logo-badge {
+            background: #ffffff;
+            color: var(--bosch-red);
+            font-weight: 900;
+            font-size: 14px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-tab-btn {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13.5px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .nav-tab-btn.active {
+            background: #ffffff;
+            color: var(--bosch-dark-blue);
+            border-color: #ffffff;
+        }
+
+        /* FŐ TARTALOM */
+        main.main-content {
+            flex: 1;
+            max-width: 1680px;
+            width: 100%;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        /* KPI SÁV */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--surface);
+            padding: 18px 20px;
+            border-radius: 10px;
+            border-left: 5px solid var(--bosch-blue);
+            box-shadow: var(--card-shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kpi-info h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .kpi-info .kpi-num {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .kpi-icon {
+            font-size: 28px;
+            opacity: 0.85;
+        }
+
+        /* KEZDŐOLDAL EGYETLEN CSEMPÉVEL */
+        .tiles-container-single {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 10px;
+        }
+
+        .pms-tile-single {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px 28px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pms-tile-single::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--bosch-accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .pms-tile-single:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--card-hover-shadow);
+            border-color: var(--bosch-accent);
+        }
+
+        .pms-tile-single:hover::before {
+            opacity: 1;
+        }
+
+        .tile-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .tile-icon-wrapper {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            background: #e8f3fa;
+            color: var(--bosch-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+        }
+
+        .tile-header h3 {
+            font-size: 19px;
+            font-weight: 700;
+            color: var(--bosch-dark-blue);
+        }
+
+        .tile-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.55;
+            margin-bottom: 24px;
+        }
+
+        .tile-action-link {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--bosch-blue);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* KERESŐ ÉS TÁBLÁZAT NÉZET */
+        .search-panel {
+            background: var(--surface);
+            padding: 20px 24px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"].global-search {
+            flex: 1;
+            min-width: 280px;
+            padding: 11px 16px;
+            font-size: 14.5px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"].global-search:focus {
+            border-color: var(--bosch-blue);
+        }
+
+        button.btn-pms {
+            padding: 11px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            background-color: var(--bosch-blue);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button.btn-pms:hover {
+            background-color: var(--bosch-dark-blue);
+        }
+
+        button.btn-secondary {
+            background-color: #495057;
+        }
+        button.btn-secondary:hover {
+            background-color: #343a40;
+        }
+
+        button.btn-export {
+            background-color: #198754;
+        }
+        button.btn-export:hover {
+            background-color: #157347;
+        }
+
+        button.btn-reset-filters {
+            background-color: #6c757d;
+            padding: 5px 10px;
+            font-size: 11.5px;
+            border-radius: 5px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button.btn-reset-filters:hover {
+            background-color: #5a6268;
+        }
+
+        .status-bar {
+            margin-top: 12px;
+            font-size: 13.5px;
+            color: var(--text-muted);
+        }
+
+        /* TÁBLÁZAT ÉS OSZLOPSZŰRŐK */
+        .table-responsive {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow-x: auto;
+            box-shadow: var(--card-shadow);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #f1f4f8;
+            color: #374151;
+            padding: 10px 12px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Szűrő sor a fejléc alatt */
+        tr.filter-row th {
+            background-color: #e9eef3;
+            padding: 6px 8px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        input.col-filter-input {
+            width: 100%;
+            min-width: 90px;
+            padding: 5px 8px;
+            font-size: 12px;
+            border: 1px solid #c2cdd8;
+            border-radius: 4px;
+            outline: none;
+            background: #ffffff;
+            color: var(--text-dark);
+            transition: border-color 0.15s;
+        }
+
+        input.col-filter-input:focus {
+            border-color: var(--bosch-blue);
+            box-shadow: 0 0 0 2px rgba(0, 86, 145, 0.15);
+        }
+
+        td {
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .badge-country {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #334155;
+            font-weight: bold;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11.5px;
+        }
+
+        .badge-time {
+            color: #4b5563;
+            font-family: monospace;
+            font-size: 11.5px;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .file-link {
+            display: inline-block;
+            background: #e7f1ff;
+            color: var(--bosch-blue);
+            padding: 5px 9px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 11.5px;
+            border: 1px solid #cce2ff;
+        }
+
+        .file-link:hover {
+            background: #cfe2ff;
+        }
+
+        .btn-download {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 5px 9px;
+            border-radius: 5px;
+            font-size: 11.5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-download:hover {
+            background: #bbf7d0;
+        }
+
+        .btn-delete {
+            background: #ffe5e5;
+            color: var(--bosch-red);
+            border: 1px solid #ffcccc;
+            padding: 5px 9px;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-delete:hover {
+            background: var(--bosch-red);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<header class="pms-header">
+    <div class="header-brand">
+        <span class="header-logo-badge">BOSCH</span>
+        <span class="header-title">POD Management System (PMS)</span>
+    </div>
+    <nav class="header-nav">
+        <button class="nav-tab-btn active" id="tabHome" onclick="switchView('home')">🏠 Kezdőlap</button>
+        <button class="nav-tab-btn" id="tabSearch" onclick="switchView('search')">🔍 Kereső & Lista</button>
+    </nav>
+</header>
+
+<main class="main-content">
+
+    <!-- 1. KEZDŐOLDAL EGYETLEN CSEMPÉVEL -->
+    <section id="viewHome" class="view-section active">
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h4>Összes Rögzített POD</h4>
+                    <div class="kpi-num" id="kpiTotalCount">-</div>
+                </div>
+                <div class="kpi-icon">📁</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: #198754;">
+                <div class="kpi-info">
+                    <h4>Adatbázis Kapcsolat</h4>
+                    <div class="kpi-num" id="kpiStatus" style="font-size: 18px; color: #198754;">Kapcsolódva</div>
+                </div>
+                <div class="kpi-icon">⚡</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: #008ecf;">
+                <div class="kpi-info">
+                    <h4>Riport Export</h4>
+                    <div class="kpi-num" style="font-size: 18px;">Master Excel</div>
+                </div>
+                <div class="kpi-icon">📊</div>
+            </div>
+        </div>
+
+        <h2 style="font-size: 18px; color: var(--bosch-dark-blue); margin-bottom: 14px;">Elérhető Modul</h2>
+
+        <div class="tiles-container-single">
+            <div class="pms-tile-single" onclick="openSearchAndFocus()">
+                <div>
+                    <div class="tile-header">
+                        <div class="tile-icon-wrapper">🔍</div>
+                        <h3>POD Dokumentum Kereső</h3>
+                    </div>
+                    <p class="tile-desc">
+                        Keresés és szűrés Invoice számlaszám, Shipment azonosító, CMR fuvarlevélszám, telephely vagy célország szerint, valamint dokumentumok letöltése és Excel exportja.
+                    </p>
+                </div>
+                <span class="tile-action-link">Megnyitás & Keresés &rarr;</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. KERESŐ ÉS TÁBLÁZAT NÉZET -->
+    <section id="viewSearch" class="view-section">
+        <div class="search-panel">
+            <div class="search-row">
+                <input type="text" id="searchInput" class="global-search" placeholder="Globális keresés (Számlaszám, Shipment, Telephely, Ország...)" autofocus>
+                <button class="btn-pms" onclick="performSearch()">🔍 Keresés</button>
+                <button class="btn-pms btn-secondary" onclick="loadAllRecords()">📋 Összes Listázása</button>
+                <button class="btn-pms btn-export" onclick="exportCurrentTableToExcel()">📥 Excel Export</button>
+            </div>
+            <div class="status-bar" id="statusMsg">Készen áll a keresésre.</div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="resultsTable">
+                <thead>
+                    <!-- Fő Fejlécek -->
+                    <tr>
+                        <th>CMR Dátum</th>
+                        <th>Invoice (DALI)</th>
+                        <th>Shipment No.</th>
+                        <th>CMR Szám</th>
+                        <th>Transport Order</th>
+                        <th>Loading List</th>
+                        <th>Customs Seal</th>
+                        <th>Box 24 Bélyegző</th>
+                        <th>Címzett</th>
+                        <th>Telephely</th>
+                        <th>Ország</th>
+                        <th>Fuvarozó</th>
+                        <th>Feltöltés Ideje</th>
+                        <th>Dokumentum</th>
+                        <th style="text-align: center;">Művelet</th>
+                    </tr>
+                    <!-- Oszloponkénti Kereső / Szűrő Sor -->
+                    <tr class="filter-row">
+                        <th><input type="text" class="col-filter-input" data-col="Datum" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Invoice_from_DALI" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Shipment_No" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="CMR_Szam" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Transport_Order" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Loading_List" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Customs_Seal" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Box_24_Belyegzo" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Cimzett" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Atvevo_Telephely" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Orszag" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Fuvarozo" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th><input type="text" class="col-filter-input" data-col="Feltoltes_Ideje" placeholder="Szűrés..." oninput="applyColumnFilters()"></th>
+                        <th colspan="2" style="text-align: center;">
+                            <button class="btn-reset-filters" onclick="resetColumnFilters()">❌ Szűrők törlése</button>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                            Nincs megjelenítendő adat. Keress rá egy azonosítóra, vagy kattints az „Összes Listázása” gombra!
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    const API_BASE = "http://127.0.0.1:8000";
+    let allFetchedRecords = [];     // A backendről beolvasott teljes adatkészlet
+    let currentlyFiltered = [];      // Az oszlopszűrőkkel leszűrt adatkészlet
+
+    function switchView(viewName) {
+        document.querySelectorAll(".view-section").forEach(s => s.classList.remove("active"));
+        document.querySelectorAll(".nav-tab-btn").forEach(b => b.classList.remove("active"));
+
+        if (viewName === "home") {
+            document.getElementById("viewHome").classList.add("active");
+            document.getElementById("tabHome").classList.add("active");
+            fetchDashboardStats();
+        } else {
+            document.getElementById("viewSearch").classList.add("active");
+            document.getElementById("tabSearch").classList.add("active");
+        }
+    }
+
+    function openSearchAndFocus() {
+        switchView("search");
+        setTimeout(() => document.getElementById("searchInput").focus(), 100);
+    }
+
+    async function fetchDashboardStats() {
+        try {
+            const res = await fetch(`${API_BASE}/api/all`);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById("kpiTotalCount").textContent = `${data.length} db`;
+                document.getElementById("kpiStatus").textContent = "Online";
+                document.getElementById("kpiStatus").style.color = "#198754";
+                allFetchedRecords = data;
+            } else {
+                document.getElementById("kpiStatus").textContent = "API Hiba";
+                document.getElementById("kpiStatus").style.color = "#d9383a";
+            }
+        } catch (e) {
+            document.getElementById("kpiStatus").textContent = "Offline";
+            document.getElementById("kpiStatus").style.color = "#d9383a";
+        }
+    }
+
+    document.getElementById("searchInput").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") {
+            performSearch();
+        }
+    });
+
+    async function performSearch() {
+        const query = document.getElementById("searchInput").value.trim();
+        const statusMsg = document.getElementById("statusMsg");
+
+        if (!query) {
+            statusMsg.textContent = "Kérlek, adj meg egy keresési értéket!";
+            return;
+        }
+
+        statusMsg.textContent = `Keresés folyamatban: "${query}"...`;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/search?query=${encodeURIComponent(query)}`);
+            if (!res.ok) throw new Error("A szerver hibát adott vissza.");
+            const data = await res.json();
+            allFetchedRecords = data;
+            resetColumnFilterInputsOnly();
+            applyColumnFilters();
+            statusMsg.textContent = `Találatok száma: ${data.length} db rekord.`;
+        } catch (err) {
+            statusMsg.textContent = `❌ Hiba a lekérdezés során: ${err.message}. Fut a 'python api_server.py'?`;
+        }
+    }
+
+    async function loadAllRecords() {
+        const statusMsg = document.getElementById("statusMsg");
+        document.getElementById("searchInput").value = "";
+        statusMsg.textContent = "Összes rekord betöltése folyamatban...";
+
+        try {
+            const res = await fetch(`${API_BASE}/api/all`);
+            if (!res.ok) throw new Error("A szerver hibát adott vissza.");
+            const data = await res.json();
+            allFetchedRecords = data;
+            resetColumnFilterInputsOnly();
+            applyColumnFilters();
+            statusMsg.textContent = `Összesen ${data.length} db rekord betöltve az adatbázisból.`;
+            document.getElementById("kpiTotalCount").textContent = `${data.length} db`;
+        } catch (err) {
+            statusMsg.textContent = `❌ Hiba a betöltéskor: ${err.message}. Fut a 'python api_server.py'?`;
+        }
+    }
+
+    // OSZLOPSZŰRŐK ALKALMAZÁSA VALÓS IDŐBEN
+    function applyColumnFilters() {
+        const filterInputs = document.querySelectorAll(".col-filter-input");
+        const activeFilters = {};
+
+        filterInputs.forEach(input => {
+            const col = input.getAttribute("data-col");
+            const val = input.value.trim().toLowerCase();
+            if (val) {
+                activeFilters[col] = val;
+            }
+        });
+
+        currentlyFiltered = allFetchedRecords.filter(row => {
+            for (const [col, filterVal] of Object.entries(activeFilters)) {
+                let cellVal = "";
+
+                if (col === "Atvevo_Telephely" || col === "Orszag") {
+                    let siteDisplay = row.Atvevo_Telephely || "";
+                    let countryDisplay = row.Orszag || "";
+                    if ((!countryDisplay || countryDisplay === "Unknown") && siteDisplay.includes(",")) {
+                        const parts = siteDisplay.split(",");
+                        siteDisplay = parts[0].trim();
+                        countryDisplay = parts[1].trim();
+                    }
+                    cellVal = (col === "Atvevo_Telephely" ? siteDisplay : countryDisplay).toLowerCase();
+                } else {
+                    cellVal = String(row[col] || "").toLowerCase();
+                }
+
+                if (!cellVal.includes(filterVal)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        renderTableRows(currentlyFiltered);
+
+        const statusMsg = document.getElementById("statusMsg");
+        const isFiltering = Object.keys(activeFilters).length > 0;
+        if (isFiltering) {
+            statusMsg.textContent = `Szűrt találatok: ${currentlyFiltered.length} / ${allFetchedRecords.length} db rekord.`;
+        }
+    }
+
+    function resetColumnFilters() {
+        resetColumnFilterInputsOnly();
+        applyColumnFilters();
+    }
+
+    function resetColumnFilterInputsOnly() {
+        document.querySelectorAll(".col-filter-input").forEach(input => input.value = "");
+    }
+
+    async function deleteRecord(filename) {
+        if (!confirm(`Biztosan törölni szeretnéd a következő rekordot az adatbázisból?\n\nFájlnév: ${filename}`)) {
+            return;
+        }
+
+        const statusMsg = document.getElementById("statusMsg");
+        statusMsg.textContent = `Törlés folyamatban: ${filename}...`;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/delete?filename=${encodeURIComponent(filename)}`, {
+                method: "DELETE"
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || "Törlési hiba történt.");
+            }
+
+            allFetchedRecords = allFetchedRecords.filter(r => r.Eredeti_Fajlnev !== filename);
+            applyColumnFilters();
+            statusMsg.textContent = `✔ A(z) '${filename}' sikeresen törölve lett az adatbázisból!`;
+            fetchDashboardStats();
+        } catch (err) {
+            statusMsg.textContent = `❌ Sikertelen törlés: ${err.message}`;
+        }
+    }
+
+    async function downloadPDF(encodedPath, fileName) {
+        try {
+            const res = await fetch(`${API_BASE}/api/file?path=${encodedPath}&download=true`);
+            if (!res.ok) {
+                alert("A fájl letöltése nem sikerült.");
+                return;
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        } catch (e) {
+            alert("Hálózati hiba a letöltés során.");
+        }
+    }
+
+    function renderTableRows(records) {
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 24px;">Nem található illeszkedő rekord a megadott szűrési feltételekkel.</td></tr>`;
+            return;
+        }
+
+        records.forEach(row => {
+            const tr = document.createElement("tr");
+            const rowId = `row-${btoa(encodeURIComponent(row.Eredeti_Fajlnev)).replace(/=/g, '')}`;
+            tr.id = rowId;
+
+            const filePath = row.Uj_Fajl_Utvonala || "";
+            const ext = filePath.includes(".") ? filePath.split('.').pop() : "pdf";
+            const targetFilename = `${row.Invoice_from_DALI || 'NoInv'}_${row.Shipment_No || 'NoShip'}.${ext}`;
+
+            const fileLink = filePath && filePath !== "N/A"
+                ? `<a href="${API_BASE}/api/file?path=${encodeURIComponent(filePath)}" target="_blank" rel="noopener noreferrer" class="file-link">📄 Megnyitás</a>`
+                : `<span style="color: #999;">N/A</span>`;
+
+            const downloadBtn = filePath && filePath !== "N/A"
+                ? `<button class="btn-download" onclick="downloadPDF('${encodeURIComponent(filePath)}', '${escapeJsString(targetFilename)}')">💾 Letöltés</button>`
+                : ``;
+
+            let siteDisplay = row.Atvevo_Telephely || "Unknown";
+            let countryDisplay = row.Orszag || "Unknown";
+            if ((!row.Orszag || row.Orszag === "Unknown") && siteDisplay.includes(",")) {
+                const parts = siteDisplay.split(",");
+                siteDisplay = parts[0].trim();
+                countryDisplay = parts[1].trim();
+            }
+
+            const uploadTime = row.Feltoltes_Ideje || "-";
+
+            tr.innerHTML = `
+                <td>${escapeHtml(row.Datum)}</td>
+                <td style="color: var(--bosch-blue); font-weight: bold;">${escapeHtml(row.Invoice_from_DALI)}</td>
+                <td>${escapeHtml(row.Shipment_No)}</td>
+                <td>${escapeHtml(row.CMR_Szam)}</td>
+                <td>${escapeHtml(row.Transport_Order)}</td>
+                <td>${escapeHtml(row.Loading_List)}</td>
+                <td>${escapeHtml(row.Customs_Seal)}</td>
+                <td>${escapeHtml(row.Box_24_Belyegzo)}</td>
+                <td>${escapeHtml(row.Cimzett)}</td>
+                <td>${escapeHtml(siteDisplay)}</td>
+                <td><span class="badge-country">${escapeHtml(countryDisplay)}</span></td>
+                <td><strong>${escapeHtml(row.Fuvarozo || "Review Manually")}</strong></td>
+                <td><span class="badge-time">${escapeHtml(uploadTime)}</span></td>
+                <td>
+                    <div class="action-btns">
+                        ${fileLink}
+                        ${downloadBtn}
+                    </div>
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn-delete" title="Sor törlése az adatbázisból" onclick="deleteRecord('${escapeJsString(row.Eredeti_Fajlnev)}')">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function exportCurrentTableToExcel() {
+        const recordsToExport = currentlyFiltered.length > 0 ? currentlyFiltered : allFetchedRecords;
+
+        if (!recordsToExport || recordsToExport.length === 0) {
+            alert("Nincs exportálható adat a táblázatban!");
+            return;
+        }
+
+        const exportData = recordsToExport.map(r => {
+            let siteDisplay = r.Atvevo_Telephely || "";
+            let countryDisplay = r.Orszag || "";
+            if (!countryDisplay && siteDisplay.includes(",")) {
+                const parts = siteDisplay.split(",");
+                siteDisplay = parts[0].trim();
+                countryDisplay = parts[1].trim();
+            }
+            return {
+                "CMR Dátum": r.Datum || "",
+                "Invoice (DALI)": r.Invoice_from_DALI || "",
+                "Shipment No.": r.Shipment_No || "",
+                "CMR Szám": r.CMR_Szam || "",
+                "Transport Order": r.Transport_Order || "",
+                "Loading List": r.Loading_List || "",
+                "Customs Seal": r.Customs_Seal || "",
+                "Box 24 Bélyegző": r.Box_24_Belyegzo || "",
+                "Címzett": r.Cimzett || "",
+                "Átvevő Telephely": siteDisplay,
+                "Ország": countryDisplay,
+                "Fuvarozó": r.Fuvarozo || "",
+                "Feltöltés Ideje": r.Feltoltes_Ideje || "",
+                "Fájl Elérési Útja": r.Uj_Fajl_Utvonala || ""
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "POD_Riport");
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(workbook, `POD_Export_${timestamp}.xlsx`);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return "-";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function escapeJsString(str) {
+        if (!str) return "";
+        return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    window.addEventListener("DOMContentLoaded", fetchDashboardStats);
+</script>
+
+</body>
+</html>
